@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif-story: "Fraunces", Georgia, serif;
+  --font-sans-body: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-handwritten: "Caveat", cursive;
+  --font-brand: "Poppins", sans-serif;
+
+  --color-ivory: #FBF8F1;
+  --color-ivory-deep: #F4EFE4;
+  --color-paper: #FFFDF8;
+  --color-ink: #2E2925;
+  --color-ink-soft: #645B53;
+  --color-ink-muted: #8C8278;
+
+  --color-dusty-rose: #D99B9B;
+  --color-dusty-rose-deep: #B56E6E;
+  --color-lavender: #C9BFDC;
+  --color-sage: #A8BCA5;
+  --color-pale-blue: #B8CCE0;
+  --color-soft-peach: #EAC5AF;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans-body);
+    background-color: var(--color-ivory);
+    color: var(--color-ink);
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-dusty-rose-deep);
+    outline-offset: 3px;
+  }
+}
+
+/* Subtle warm paper grain overlay — compositor friendly, zero interaction capture */
+.paper-grain {
+  background-image: radial-gradient(rgba(70, 56, 42, 0.032) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.paper-card {
+  background-color: #FFFDF8;
+  box-shadow:
+    0 1px 2px rgba(46, 41, 37, 0.04),
+    0 10px 30px -12px rgba(74, 60, 48, 0.11);
+  border: 1px solid rgba(92, 78, 64, 0.09);
+}
+
+.polaroid-shadow {
+  box-shadow:
+    0 2px 5px rgba(46, 41, 37, 0.06),
+    0 14px 28px -10px rgba(62, 50, 38, 0.14);
+}
+
+/* Washi tape subtle translucency */
+.washi-tape {
+  backdrop-filter: blur(1px);
+  box-shadow: 0 1px 2px rgba(46, 41, 37, 0.06);
+}
+
+@keyframes gentle-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1.5deg);
+  }
+}
+
+@keyframes slow-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(18px, -6px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes petal-drift {
+  0% {
+    transform: translate3d(0, -10px, 0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  85% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate3d(28px, 110px, 0) rotate(42deg);
+    opacity: 0;
+  }
+}
+
+@keyframes soft-blink {
+  0%, 92%, 100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes gentle-breathe {
+  0%, 100% {
+    transform: scaleY(1) translateY(0px);
+  }
+  50% {
+    transform: scaleY(1.022) translateY(-1.5px);
+  }
+}
+
+@keyframes sleep-zzz {
+  0% {
+    transform: translate(0, 0) scale(0.75);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(10px, -20px) scale(1.05);
+    opacity: 0;
+  }
+}
+
+.animate-gentle-float {
+  animation: gentle-float 5.5s ease-in-out infinite;
+}
+
+.animate-slow-drift {
+  animation: slow-drift 18s ease-in-out infinite;
+}
+
+.animate-petal-drift {
+  animation: petal-drift 14s ease-in-out infinite;
+}
+
+.animate-soft-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: soft-blink 4.8s ease-in-out infinite;
+}
+
+.animate-gentle-breathe {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: gentle-breathe 3.8s ease-in-out infinite;
+}
+
+.animate-sleep-zzz {
+  animation: sleep-zzz 3.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-gentle-float,
+  .animate-slow-drift,
+  .animate-petal-drift,
+  .animate-soft-blink,
+  .animate-gentle-breathe,
+  .animate-sleep-zzz {
+    animation: none !important;
+  }
+}

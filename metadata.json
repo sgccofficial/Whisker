@@ -1,0 +1,6 @@
+{
+  "name": "For You — A Little Friendship Gift",
+  "description": "A personalized, interactive storybook friendship card filled with playful moments, hidden notes, and treasured memories.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
