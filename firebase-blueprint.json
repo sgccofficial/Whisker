@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "Gift": {
+      "title": "Friendship Gift",
+      "description": "A personalized, live-updatable storybook friendship card tied to a unique shareable gift ID.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the creator who owns and can update this gift.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "friendLabel": {
+          "type": "string",
+          "description": "Welcome screen greeting line.",
+          "maxLength": 120
+        },
+        "envelopeLabel": {
+          "type": "string",
+          "description": "Handwritten label on the envelope.",
+          "maxLength": 120
+        },
+        "openingLetter": {
+          "type": "string",
+          "description": "Opening card message inside the envelope.",
+          "maxLength": 2000
+        },
+        "scrapbookIntroKicker": {
+          "type": "string",
+          "description": "Small handwritten kicker above the first scrapbook spread.",
+          "maxLength": 120
+        },
+        "scrapbookIntroHeading": {
+          "type": "string",
+          "description": "Heading above the first scrapbook spread.",
+          "maxLength": 240
+        },
+        "mainReflection": {
+          "type": "string",
+          "description": "Main conversational reflection card prose.",
+          "maxLength": 3000
+        },
+        "secondNote": {
+          "type": "string",
+          "description": "Conversational side note beside the first Polaroid spread.",
+          "maxLength": 1000
+        },
+        "collageHeading": {
+          "type": "string",
+          "description": "Heading above the overlapping photo constellation.",
+          "maxLength": 240
+        },
+        "hiddenFlowerNote": {
+          "type": "string",
+          "description": "Short hidden message revealed when tapping the flower doodle.",
+          "maxLength": 300
+        },
+        "hiddenEnvelopeNote": {
+          "type": "string",
+          "description": "Short P.S. message revealed when tapping the hidden mini-envelope.",
+          "maxLength": 600
+        },
+        "endingText": {
+          "type": "string",
+          "description": "Newline-separated closing lines for the ending card.",
+          "maxLength": 1500
+        },
+        "endingSignOff": {
+          "type": "string",
+          "description": "Handwritten closing sign-off line.",
+          "maxLength": 200
+        },
+        "photos": {
+          "type": "array",
+          "description": "Fixed 6-slot list of Polaroid memory objects (id, src, caption, dateNote, memoryNote)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the unique gift link was first created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the gift was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "friendLabel",
+        "envelopeLabel",
+        "openingLetter",
+        "scrapbookIntroKicker",
+        "scrapbookIntroHeading",
+        "mainReflection",
+        "secondNote",
+        "collageHeading",
+        "hiddenFlowerNote",
+        "hiddenEnvelopeNote",
+        "endingText",
+        "endingSignOff",
+        "photos",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/gifts/{giftId}": {
+      "schema": { "$ref": "#/entities/Gift" },
+      "description": "Stores each unique, live-updatable friendship gift document. Readable by single-doc get with the unique giftId; writable only by its verified ownerId."
+    }
+  }
+}

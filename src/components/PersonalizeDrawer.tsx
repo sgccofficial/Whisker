@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, RotateCcw } from 'lucide-react';
 import { ExperienceConfig } from '../data/experienceContent';
 import { compressImageDataUrl } from '../utils/shareLink';
+import { GIFT_LIMITS } from '../services/giftService';
 
 interface PersonalizeDrawerProps {
   open: boolean;
   config: ExperienceConfig;
+  syncStatus?: 'local' | 'saving' | 'synced' | 'error';
   onChange: (next: ExperienceConfig) => void;
   onReset: () => void;
   onClose: () => void;
@@ -15,6 +17,7 @@ interface PersonalizeDrawerProps {
 export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
   open,
   config,
+  syncStatus = 'local',
   onChange,
   onReset,
   onClose,
@@ -38,12 +41,21 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
     const reader = new FileReader();
     reader.onload = async () => {
       if (typeof reader.result === 'string') {
-        const compressed = await compressImageDataUrl(reader.result, 900, 0.82);
+        const compressed = await compressImageDataUrl(reader.result, 760, 0.72);
         updatePhoto(id, { src: compressed });
       }
     };
     reader.readAsDataURL(file);
   };
+
+  const subtitleText =
+    syncStatus === 'saving'
+      ? 'Saving changes to your shared link...'
+      : syncStatus === 'synced'
+        ? 'Changes update live on your shared link.'
+        : syncStatus === 'error'
+          ? 'Saved locally — reopen Share link to retry syncing.'
+          : 'Changes update live and save in this browser.';
 
   return (
     <AnimatePresence>
@@ -76,9 +88,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                 >
                   Personalize this gift
                 </h2>
-                <p className="text-xs text-[#7B7167] mt-0.5">
-                  Changes update live and save in this browser.
-                </p>
+                <p className="text-xs text-[#7B7167] mt-0.5">{subtitleText}</p>
               </div>
               <button
                 type="button"
@@ -102,6 +112,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Welcome greeting</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.friendLabel}
                     value={config.friendLabel}
                     onChange={(e) =>
                       onChange({ ...config, friendLabel: e.target.value })
@@ -114,6 +125,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Envelope label</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.envelopeLabel}
                     value={config.envelopeLabel}
                     onChange={(e) =>
                       onChange({ ...config, envelopeLabel: e.target.value })
@@ -126,6 +138,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">First card message</span>
                   <textarea
                     rows={3}
+                    maxLength={GIFT_LIMITS.openingLetter}
                     value={config.openingLetter}
                     onChange={(e) =>
                       onChange({ ...config, openingLetter: e.target.value })
@@ -145,6 +158,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Scrapbook small label</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.scrapbookIntroKicker}
                     value={config.scrapbookIntroKicker}
                     onChange={(e) =>
                       onChange({ ...config, scrapbookIntroKicker: e.target.value })
@@ -157,6 +171,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Scrapbook intro heading</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.scrapbookIntroHeading}
                     value={config.scrapbookIntroHeading}
                     onChange={(e) =>
                       onChange({ ...config, scrapbookIntroHeading: e.target.value })
@@ -169,6 +184,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Side note beside first photos</span>
                   <textarea
                     rows={3}
+                    maxLength={GIFT_LIMITS.secondNote}
                     value={config.secondNote}
                     onChange={(e) =>
                       onChange({ ...config, secondNote: e.target.value })
@@ -181,6 +197,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Main reflection card</span>
                   <textarea
                     rows={4}
+                    maxLength={GIFT_LIMITS.mainReflection}
                     value={config.mainReflection}
                     onChange={(e) =>
                       onChange({ ...config, mainReflection: e.target.value })
@@ -193,6 +210,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Hidden flower note</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.hiddenFlowerNote}
                     value={config.hiddenFlowerNote}
                     onChange={(e) =>
                       onChange({ ...config, hiddenFlowerNote: e.target.value })
@@ -205,6 +223,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Photo collage heading</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.collageHeading}
                     value={config.collageHeading}
                     onChange={(e) =>
                       onChange({ ...config, collageHeading: e.target.value })
@@ -217,6 +236,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Hidden secret envelope P.S.</span>
                   <textarea
                     rows={2}
+                    maxLength={GIFT_LIMITS.hiddenEnvelopeNote}
                     value={config.hiddenEnvelopeNote}
                     onChange={(e) =>
                       onChange({ ...config, hiddenEnvelopeNote: e.target.value })
@@ -275,6 +295,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                         <span className="text-[11px] text-[#7B7167]">Polaroid caption</span>
                         <input
                           type="text"
+                          maxLength={GIFT_LIMITS.photoCaption}
                           placeholder="Leave empty for no caption"
                           value={photo.caption ?? ''}
                           onChange={(e) =>
@@ -290,6 +311,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                         </span>
                         <input
                           type="text"
+                          maxLength={GIFT_LIMITS.photoDateNote}
                           placeholder="Optional subtitle underneath caption"
                           value={photo.dateNote ?? ''}
                           onChange={(e) =>
@@ -305,6 +327,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                         </span>
                         <textarea
                           rows={2}
+                          maxLength={GIFT_LIMITS.photoMemoryNote}
                           placeholder="Optional memory note in full view"
                           value={photo.memoryNote ?? ''}
                           onChange={(e) =>
@@ -330,6 +353,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   </span>
                   <textarea
                     rows={4}
+                    maxLength={GIFT_LIMITS.endingText}
                     value={config.endingLines.join('\n')}
                     onChange={(e) =>
                       onChange({
@@ -345,6 +369,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                   <span className="text-xs text-[#6B6158]">Handwritten sign-off</span>
                   <input
                     type="text"
+                    maxLength={GIFT_LIMITS.endingSignOff}
                     value={config.endingSignOff}
                     onChange={(e) =>
                       onChange({ ...config, endingSignOff: e.target.value })

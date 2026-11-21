@@ -8,14 +8,17 @@ interface StarSpec {
   size: number;
   color: string;
   delay: number;
+  driftX: number;
+  driftY: number;
+  duration: number;
 }
 
 const AMBIENT_STARS: StarSpec[] = [
-  { id: 's1', top: '12%', left: '14%', size: 22, color: '#D99B9B', delay: 0 },
-  { id: 's2', top: '19%', left: '84%', size: 20, color: '#C9BFDC', delay: 1.4 },
-  { id: 's3', top: '44%', left: '8%', size: 18, color: '#A8BCA5', delay: 2.2 },
-  { id: 's4', top: '66%', left: '89%', size: 21, color: '#EAC5AF', delay: 0.7 },
-  { id: 's5', top: '82%', left: '16%', size: 19, color: '#B8CCE0', delay: 1.9 },
+  { id: 's1', top: '12%', left: '14%', size: 22, color: '#D99B9B', delay: 0, driftX: 12, driftY: -9, duration: 8.2 },
+  { id: 's2', top: '19%', left: '84%', size: 20, color: '#C9BFDC', delay: 1.4, driftX: -13, driftY: 10, duration: 9.1 },
+  { id: 's3', top: '44%', left: '8%', size: 18, color: '#A8BCA5', delay: 2.2, driftX: 10, driftY: 12, duration: 9.6 },
+  { id: 's4', top: '66%', left: '89%', size: 21, color: '#EAC5AF', delay: 0.7, driftX: -11, driftY: -10, duration: 8.5 },
+  { id: 's5', top: '82%', left: '16%', size: 19, color: '#B8CCE0', delay: 1.9, driftX: 12, driftY: -8, duration: 8.9 },
 ];
 
 const SPARK_OFFSETS = [
@@ -28,7 +31,7 @@ const SPARK_OFFSETS = [
 ];
 
 /**
- * Interactive little hand-drawn star: tap it and it bursts into tiny sparkles and disappears.
+ * Interactive little hand-drawn star: drifts subtly and bursts into tiny sparkles when tapped.
  */
 export const TappableStar: React.FC<{
   top: string;
@@ -36,7 +39,19 @@ export const TappableStar: React.FC<{
   size?: number;
   color?: string;
   delay?: number;
-}> = ({ top, left, size = 20, color = '#D99B9B', delay = 0 }) => {
+  driftX?: number;
+  driftY?: number;
+  duration?: number;
+}> = ({
+  top,
+  left,
+  size = 20,
+  color = '#D99B9B',
+  delay = 0,
+  driftX = 10,
+  driftY = -8,
+  duration = 8.5,
+}) => {
   const [popped, setPopped] = useState(false);
   const [gone, setGone] = useState(false);
 
@@ -49,9 +64,23 @@ export const TappableStar: React.FC<{
   };
 
   return (
-    <div
+    <motion.div
       className="fixed z-30 pointer-events-auto"
       style={{ top, left }}
+      animate={
+        popped
+          ? {}
+          : {
+              x: [0, driftX, -driftX * 0.45, 0],
+              y: [0, driftY, -driftY * 0.55, 0],
+            }
+      }
+      transition={{
+        duration,
+        delay,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      }}
     >
       <AnimatePresence>
         {!popped ? (
@@ -63,7 +92,7 @@ export const TappableStar: React.FC<{
             animate={{
               opacity: [0.55, 0.92, 0.55],
               scale: [0.95, 1.07, 0.95],
-              rotate: [0, 8, -4, 0],
+              rotate: [0, 9, -5, 0],
             }}
             exit={{ scale: 1.35, opacity: 0, transition: { duration: 0.14 } }}
             transition={{
@@ -123,19 +152,23 @@ export const TappableStar: React.FC<{
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 
 interface AmbientBackdropProps {
   quiet?: boolean;
+  hideStars?: boolean;
 }
 
 /**
  * Calm warm paper backdrop with subtle drifting clouds, occasional botanical petals,
- * and optional tappable stars. Quiets down gracefully for the ending.
+ * and subtly drifting tappable stars.
  */
-export const AmbientBackdrop: React.FC<AmbientBackdropProps> = ({ quiet = false }) => {
+export const AmbientBackdrop: React.FC<AmbientBackdropProps> = ({
+  quiet = false,
+  hideStars = false,
+}) => {
   return (
     <>
       {/* Non-interactive paper grain & soft drifting clouds */}
@@ -200,8 +233,9 @@ export const AmbientBackdrop: React.FC<AmbientBackdropProps> = ({ quiet = false 
         )}
       </div>
 
-      {/* Tappable floating little stars (subtle, sparse, rewarding curiosity) */}
+      {/* Subtly drifting tappable stars in their original positions */}
       {!quiet &&
+        !hideStars &&
         AMBIENT_STARS.map((star) => (
           <TappableStar
             key={star.id}
@@ -210,6 +244,9 @@ export const AmbientBackdrop: React.FC<AmbientBackdropProps> = ({ quiet = false 
             size={star.size}
             color={star.color}
             delay={star.delay}
+            driftX={star.driftX}
+            driftY={star.driftY}
+            duration={star.duration}
           />
         ))}
     </>

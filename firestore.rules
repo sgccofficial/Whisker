@@ -1,0 +1,152 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global hardened helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidPhoto(p) {
+      return p is map
+        && p.keys().hasAll(['id', 'src', 'caption', 'dateNote', 'memoryNote'])
+        && p.keys().hasOnly(['id', 'src', 'caption', 'dateNote', 'memoryNote'])
+        && p.id is string && p.id.size() >= 1 && p.id.size() <= 64 && p.id.matches('^[a-zA-Z0-9_\\-]+$')
+        && p.src is string && p.src.size() >= 1 && p.src.size() <= 130000
+        && p.caption is string && p.caption.size() <= 200
+        && p.dateNote is string && p.dateNote.size() <= 120
+        && p.memoryNote is string && p.memoryNote.size() <= 600;
+    }
+
+    function isValidGift(data) {
+      return data is map
+        && data.keys().hasAll([
+          'ownerId',
+          'friendLabel',
+          'envelopeLabel',
+          'openingLetter',
+          'scrapbookIntroKicker',
+          'scrapbookIntroHeading',
+          'mainReflection',
+          'secondNote',
+          'collageHeading',
+          'hiddenFlowerNote',
+          'hiddenEnvelopeNote',
+          'endingText',
+          'endingSignOff',
+          'photos',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'friendLabel',
+          'envelopeLabel',
+          'openingLetter',
+          'scrapbookIntroKicker',
+          'scrapbookIntroHeading',
+          'mainReflection',
+          'secondNote',
+          'collageHeading',
+          'hiddenFlowerNote',
+          'hiddenEnvelopeNote',
+          'endingText',
+          'endingSignOff',
+          'photos',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.friendLabel is string && data.friendLabel.size() <= 120
+        && data.envelopeLabel is string && data.envelopeLabel.size() <= 120
+        && data.openingLetter is string && data.openingLetter.size() <= 2000
+        && data.scrapbookIntroKicker is string && data.scrapbookIntroKicker.size() <= 120
+        && data.scrapbookIntroHeading is string && data.scrapbookIntroHeading.size() <= 240
+        && data.mainReflection is string && data.mainReflection.size() <= 3000
+        && data.secondNote is string && data.secondNote.size() <= 1000
+        && data.collageHeading is string && data.collageHeading.size() <= 240
+        && data.hiddenFlowerNote is string && data.hiddenFlowerNote.size() <= 300
+        && data.hiddenEnvelopeNote is string && data.hiddenEnvelopeNote.size() <= 600
+        && data.endingText is string && data.endingText.size() <= 1500
+        && data.endingSignOff is string && data.endingSignOff.size() <= 200
+        && data.photos is list
+        && data.photos.size() == 6
+        && isValidPhoto(data.photos[0])
+        && isValidPhoto(data.photos[1])
+        && isValidPhoto(data.photos[2])
+        && isValidPhoto(data.photos[3])
+        && isValidPhoto(data.photos[4])
+        && isValidPhoto(data.photos[5])
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /gifts/{giftId} {
+      // Recipients with the exact unique gift link can view read-only without signing in (zero PII stored)
+      allow get: if isValidId(giftId);
+
+      // Creators may list only their own gifts (for future homepage)
+      allow list: if isVerifiedUser()
+        && existing().ownerId == request.auth.uid;
+
+      // Only verified signed-in creators can create a unique gift linked to their UID
+      allow create: if isVerifiedUser()
+        && isValidId(giftId)
+        && isValidGift(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      // Only the verified owner can update mutable content fields on the same gift link
+      allow update: if isVerifiedUser()
+        && isValidId(giftId)
+        && isValidGift(incoming())
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'friendLabel',
+          'envelopeLabel',
+          'openingLetter',
+          'scrapbookIntroKicker',
+          'scrapbookIntroHeading',
+          'mainReflection',
+          'secondNote',
+          'collageHeading',
+          'hiddenFlowerNote',
+          'hiddenEnvelopeNote',
+          'endingText',
+          'endingSignOff',
+          'photos',
+          'updatedAt'
+        ]);
+
+      // Only the verified owner can delete their own gift
+      allow delete: if isVerifiedUser()
+        && isValidId(giftId)
+        && existing().ownerId == request.auth.uid;
+    }
+  }
+}
