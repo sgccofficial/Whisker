@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload } from 'lucide-react';
+import { X, Upload, Copy, Check } from 'lucide-react';
 import { ExperienceConfig } from '../data/experienceContent';
 import { compressImageDataUrl } from '../utils/imageCompress';
 
@@ -20,6 +20,37 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
   onClose,
 }) => {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [copiedText, setCopiedText] = useState(false);
+
+  const handleCopyTextBackup = async () => {
+    const textOnly = {
+      friendLabel: config.friendLabel,
+      envelopeLabel: config.envelopeLabel,
+      openingLetter: config.openingLetter,
+      scrapbookIntroKicker: config.scrapbookIntroKicker,
+      scrapbookIntroHeading: config.scrapbookIntroHeading,
+      mainReflection: config.mainReflection,
+      secondNote: config.secondNote,
+      collageHeading: config.collageHeading,
+      hiddenFlowerNote: config.hiddenFlowerNote,
+      hiddenEnvelopeNote: config.hiddenEnvelopeNote,
+      endingLines: config.endingLines,
+      endingSignOff: config.endingSignOff,
+      photos: config.photos.map((p) => ({
+        id: p.id,
+        caption: p.caption ?? '',
+        dateNote: p.dateNote ?? '',
+        memoryNote: p.memoryNote ?? '',
+      })),
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(textOnly, null, 2));
+      setCopiedText(true);
+      window.setTimeout(() => setCopiedText(false), 2400);
+    } catch {
+      // Ignore clipboard permission errors
+    }
+  };
 
   const updatePhoto = (
     id: string,
@@ -358,7 +389,25 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
             </div>
 
             {/* Footer actions */}
-            <div className="px-6 py-4 border-t border-[#3A322C]/10 flex items-center justify-end gap-3">
+            <div className="px-6 py-4 border-t border-[#3A322C]/10 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleCopyTextBackup}
+                className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-full text-xs font-medium text-[#6B6158] hover:text-[#2E2925] hover:bg-[#EFE9DD] transition-colors whitespace-nowrap shrink-0"
+              >
+                {copiedText ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-[#4E6B53]" aria-hidden="true" />
+                    <span>Copied text</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Copy all text</span>
+                  </>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={onClose}

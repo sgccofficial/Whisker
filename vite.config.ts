@@ -124,7 +124,8 @@ function bakeDefaultsDevPlugin(): Plugin {
                   resolvedSrc = `/src/assets/images/${filename}`;
                 } else if (
                   item.src.startsWith('/src/assets/images/') &&
-                  !item.src.includes('..')
+                  !item.src.includes('..') &&
+                  fs.existsSync(path.join(imagesDir, path.basename(item.src)))
                 ) {
                   resolvedSrc = item.src;
                 }

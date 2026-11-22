@@ -10,7 +10,6 @@ import {
   ExperienceConfig,
   ScrapbookPhoto,
   bakeDefaultsToProject,
-  clearSavedLocalExperience,
   hasSavedLocalExperience,
   loadSavedExperience,
   saveExperience,
@@ -58,7 +57,7 @@ export default function App() {
         if (seq !== bakeSeqRef.current) return;
         if (baked) {
           setConfig(baked);
-          clearSavedLocalExperience();
+          saveExperience(baked);
         }
         setSavingDefaults(false);
       });

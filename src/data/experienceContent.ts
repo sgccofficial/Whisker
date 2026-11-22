@@ -84,7 +84,7 @@ export const FURTHER_NO_REACTIONS: NoReaction[] = [
 
 export const DEFAULT_EXPERIENCE: ExperienceConfig = defaultExperienceData as ExperienceConfig;
 
-const STORAGE_KEY = 'friendship_experience_custom_v1';
+const STORAGE_KEY = 'friendship_experience_custom_v2';
 
 export function loadSavedExperience(): ExperienceConfig {
   try {
@@ -96,10 +96,19 @@ export function loadSavedExperience(): ExperienceConfig {
       ...parsed,
       photos:
         Array.isArray(parsed.photos) && parsed.photos.length === DEFAULT_EXPERIENCE.photos.length
-          ? parsed.photos.map((p, idx) => ({
-              ...DEFAULT_EXPERIENCE.photos[idx],
-              ...p,
-            }))
+          ? parsed.photos.map((p, idx) => {
+              const base = DEFAULT_EXPERIENCE.photos[idx];
+              const savedSrc = typeof p?.src === 'string' ? p.src : '';
+              const isStaleFilePath =
+                !savedSrc ||
+                savedSrc.startsWith('/src/assets/images/memory_') ||
+                savedSrc.startsWith('/src/assets/images/photo_');
+              return {
+                ...base,
+                ...p,
+                src: isStaleFilePath ? base.src : savedSrc,
+              };
+            })
           : DEFAULT_EXPERIENCE.photos,
     };
   } catch {
