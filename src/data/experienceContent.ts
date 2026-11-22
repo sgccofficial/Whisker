@@ -1,3 +1,5 @@
+import defaultExperienceData from './defaultExperience.json';
+
 export type TapeTone = 'rose' | 'sage' | 'lavender' | 'peach' | 'blue';
 
 export interface ScrapbookPhoto {
@@ -80,96 +82,7 @@ export const FURTHER_NO_REACTIONS: NoReaction[] = [
   { message: "Fine... I'll wait. But not really.", mood: 'sitting-away', characterOffset: 'low' },
 ];
 
-export const DEFAULT_EXPERIENCE: ExperienceConfig = {
-  friendLabel: 'Hey, you.',
-  envelopeLabel: 'For you ♡',
-  openingLetter:
-    "Some things don't need a special occasion.\n\nSometimes, you just want to make something for someone and let them know they're appreciated.",
-  scrapbookIntroKicker: 'a few little frames',
-  scrapbookIntroHeading: 'Tap any photograph to hold it a little closer.',
-  mainReflection:
-    "It's funny how certain people slowly become a part of your everyday life.\n\nYou don't necessarily notice it happening. You just get used to talking to them, sharing things, laughing at random nonsense, and having them around.\n\nAnd eventually, you realize that their presence has become something you genuinely appreciate.",
-  secondNote:
-    "Half of our best memories are just ordinary afternoons that turned into three-hour conversations about nothing at all. Somehow those are always the ones that stick.",
-  collageHeading: 'Some moments are better kept than explained.',
-  hiddenFlowerNote: 'glad our paths crossed when they did.',
-  hiddenEnvelopeNote:
-    'P.S. Thank you for always listening to my completely unnecessary 20-minute stories like they actually matter.',
-  endingLines: [
-    'Anyway...',
-    "I'm genuinely glad you're my friend.",
-    'I just wanted to make something a little different for you.',
-    'I hope it made you smile.',
-  ],
-  endingSignOff: 'A little friendship. A little happiness. ♡',
-  photos: [
-    {
-      id: 'coffee-afternoon',
-      src: '/src/assets/images/memory_coffee_afternoon_1795270308300.jpg',
-      alt: 'Two friends laughing over iced coffee and a shared pastry at a sunlit wooden cafe table',
-      caption: 'iced coffee & zero sense of time',
-      dateNote: 'one slow afternoon',
-      memoryNote: 'We only planned to stop by for twenty minutes. Two hours later we were still laughing at the exact same joke.',
-      aspect: '4/3',
-      tilt: -2.4,
-      tape: 'peach',
-    },
-    {
-      id: 'picnic-blanket',
-      src: '/src/assets/images/memory_picnic_blanket_1795270307597.jpg',
-      alt: 'Two friends sitting on a sunlit picnic blanket in the park with wildflowers and fruit',
-      caption: 'sunlight, snacks, and nowhere else to be',
-      dateNote: 'golden afternoon',
-      memoryNote: 'One of those effortlessly good days where nothing fancy happened, yet everything felt right.',
-      aspect: '1/1',
-      tilt: 2.1,
-      tape: 'sage',
-    },
-    {
-      id: 'sunset-walk',
-      src: '/src/assets/images/memory_sunset_walk_1795270307270.jpg',
-      alt: 'Quiet leafy tree-lined street glowing in warm pastel sunset light',
-      caption: "I don't know why, but this one belongs here.",
-      dateNote: 'walking home late',
-      memoryNote: 'Some streets just feel different when you have good company and nowhere urgent to rush to.',
-      aspect: '3/4',
-      tilt: -1.4,
-      tape: 'lavender',
-    },
-    {
-      id: 'rainy-window',
-      src: '/src/assets/images/memory_rainy_window_1795270308972.jpg',
-      alt: 'Raindrops on a cozy window looking out toward warm blurred street lights at dusk',
-      caption: '',
-      memoryNote: 'Quiet rain outside, warm tea inside. No caption needed for this feeling.',
-      aspect: '3/4',
-      tilt: 1.8,
-      tape: 'blue',
-    },
-    {
-      id: 'evening-lights',
-      src: '/src/assets/images/memory_evening_lights_1795270304882.jpg',
-      alt: 'Warm string lights glowing over a quiet evening outdoor courtyard table at twilight',
-      caption: 'Some moments are better kept than explained.',
-      dateNote: 'under the string lights',
-      memoryNote: 'The kind of evening conversation you wish could stretch on just a little longer.',
-      aspect: '4/3',
-      tilt: -2.0,
-      tape: 'rose',
-    },
-    {
-      id: 'golden-shore',
-      src: '/src/assets/images/memory_golden_shore_1795270327720.jpg',
-      alt: 'Two sets of footprints walking side by side along a pastel sunset shoreline',
-      caption: 'still my favorite view',
-      dateNote: 'by the water',
-      memoryNote: 'Soft pastel sky, cool sand, and quiet laughter over the sound of the waves.',
-      aspect: '4/3',
-      tilt: 1.5,
-      tape: 'blue',
-    },
-  ],
-};
+export const DEFAULT_EXPERIENCE: ExperienceConfig = defaultExperienceData as ExperienceConfig;
 
 const STORAGE_KEY = 'friendship_experience_custom_v1';
 
@@ -198,14 +111,45 @@ export function saveExperience(config: ExperienceConfig): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch {
-    // Storage quota exceeded (e.g. very large local image) — keep in runtime state silently
+    // Storage quota exceeded — keep in runtime state silently
   }
 }
 
-export function resetSavedExperience(): void {
+export function hasSavedLocalExperience(): boolean {
+  try {
+    return Boolean(window.localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+export function clearSavedLocalExperience(): void {
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     // Ignore storage errors
+  }
+}
+
+/**
+ * In AI Studio preview (Vite dev server), writes the customized photos and text
+ * directly into `src/assets/images/` and `src/data/defaultExperience.json` so they
+ * become the permanent original defaults when deployed to Cloudflare Pages.
+ */
+export async function bakeDefaultsToProject(
+  config: ExperienceConfig
+): Promise<ExperienceConfig | null> {
+  if (!import.meta.env.DEV) return null;
+  try {
+    const res = await fetch('/__bake-defaults', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { ok?: boolean; config?: ExperienceConfig };
+    return data.ok && data.config ? data.config : null;
+  } catch {
+    return null;
   }
 }

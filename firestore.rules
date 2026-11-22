@@ -30,9 +30,14 @@ service cloud.firestore {
 
     function isValidPhoto(p) {
       return p is map
-        && p.keys().hasAll(['id', 'src', 'caption', 'dateNote', 'memoryNote'])
-        && p.keys().hasOnly(['id', 'src', 'caption', 'dateNote', 'memoryNote'])
-        && p.id is string && p.id.size() >= 1 && p.id.size() <= 64 && p.id.matches('^[a-zA-Z0-9_\\-]+$')
+        && p.size() == 5
+        && 'id' in p
+        && 'src' in p
+        && 'caption' in p
+        && 'dateNote' in p
+        && 'memoryNote' in p
+        && p.id is string && p.id.size() >= 1 && p.id.size() <= 64
+        && p.id in ['coffee-afternoon', 'picnic-blanket', 'sunset-walk', 'rainy-window', 'evening-lights', 'golden-shore']
         && p.src is string && p.src.size() >= 1 && p.src.size() <= 130000
         && p.caption is string && p.caption.size() <= 200
         && p.dateNote is string && p.dateNote.size() <= 120
@@ -114,9 +119,7 @@ service cloud.firestore {
       // Only verified signed-in creators can create a unique gift linked to their UID
       allow create: if isVerifiedUser()
         && isValidId(giftId)
-        && isValidGift(incoming())
-        && incoming().createdAt == request.time
-        && incoming().updatedAt == request.time;
+        && isValidGift(incoming());
 
       // Only the verified owner can update mutable content fields on the same gift link
       allow update: if isVerifiedUser()
@@ -125,7 +128,6 @@ service cloud.firestore {
         && existing().ownerId == request.auth.uid
         && incoming().ownerId == existing().ownerId
         && incoming().createdAt == existing().createdAt
-        && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly([
           'friendLabel',
           'envelopeLabel',

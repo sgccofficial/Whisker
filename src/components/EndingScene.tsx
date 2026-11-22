@@ -1,24 +1,22 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { RotateCcw, SlidersHorizontal, Link2 } from 'lucide-react';
+import { RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { MochiCharacter } from './Characters';
 
 interface EndingSceneProps {
   endingLines: string[];
   endingSignOff: string;
-  isReadOnly?: boolean;
+  canEdit?: boolean;
   onReplay: () => void;
   onOpenPersonalize: () => void;
-  onOpenShareLink: () => void;
 }
 
 export const EndingScene: React.FC<EndingSceneProps> = ({
   endingLines,
   endingSignOff,
-  isReadOnly = false,
+  canEdit = false,
   onReplay,
   onOpenPersonalize,
-  onOpenShareLink,
 }) => {
   return (
     <section
@@ -70,7 +68,7 @@ export const EndingScene: React.FC<EndingSceneProps> = ({
         </div>
       </motion.div>
 
-      {/* Quiet, understated footer links — edit & share actions are hidden in read-only shared links */}
+      {/* Quiet, understated footer links — personalize button is shown only in AI Studio preview */}
       <div className="mt-12 flex flex-col items-center gap-2 text-sm text-[#7B7167]">
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
           <button
@@ -82,7 +80,7 @@ export const EndingScene: React.FC<EndingSceneProps> = ({
             <span>Start from the beginning</span>
           </button>
 
-          {!isReadOnly && (
+          {canEdit && (
             <>
               <span aria-hidden="true" className="text-[#C7BEB3]">
                 ·
@@ -99,17 +97,6 @@ export const EndingScene: React.FC<EndingSceneProps> = ({
             </>
           )}
         </div>
-
-        {!isReadOnly && (
-          <button
-            type="button"
-            onClick={onOpenShareLink}
-            className="mt-2 inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2 rounded-full bg-[#2E2925] text-[#FBF8F1] text-sm font-medium hover:bg-[#413A34] transition-colors whitespace-nowrap shrink-0"
-          >
-            <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Generate shareable link</span>
-          </button>
-        )}
       </div>
 
       {/* Chunky, background-blended Swiggy-style ending signature */}

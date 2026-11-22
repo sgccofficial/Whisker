@@ -5,24 +5,16 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from './firebase';
 import {
   DEFAULT_EXPERIENCE,
   ExperienceConfig,
   ScrapbookPhoto,
+  bakeDefaultsToProject,
+  clearSavedLocalExperience,
+  hasSavedLocalExperience,
   loadSavedExperience,
   saveExperience,
-  resetSavedExperience,
 } from './data/experienceContent';
-import { hasShareHashInUrl, parseSharedGiftFromUrl } from './utils/shareLink';
-import {
-  getOrCreateActiveGiftId,
-  getSharedGiftIdFromUrl,
-  isGiftAlreadyPublished,
-  saveGiftToFirestore,
-  subscribeToSharedGift,
-} from './services/giftService';
 import { AmbientBackdrop } from './components/AmbientBackdrop';
 import { WelcomeScene } from './components/WelcomeScene';
 import { TrustQuestionScene } from './components/TrustQuestionScene';
@@ -32,10 +24,10 @@ import { ScrapbookCard } from './components/ScrapbookCard';
 import { EndingScene } from './components/EndingScene';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { PersonalizeDrawer } from './components/PersonalizeDrawer';
-import { ShareLinkModal } from './components/ShareLinkModal';
 
 type JourneyStage = 'welcome' | 'question' | 'surprise' | 'card';
-type SyncStatus = 'local' | 'saving' | 'synced' | 'error';
+
+const IS_DEV_EDITOR = import.meta.env.DEV;
 
 export default function App() {
   const [stage, setStage] = useState<JourneyStage>('welcome');
@@ -43,110 +35,51 @@ export default function App() {
   const [nearEnding, setNearEnding] = useState(false);
   const [activePhoto, setActivePhoto] = useState<ScrapbookPhoto | null>(null);
   const [personalizeOpen, setPersonalizeOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-
-  const [authUser, setAuthUser] = useState<User | null>(null);
-  const [activeGiftId, setActiveGiftId] = useState<string>(() => getOrCreateActiveGiftId());
-  const [published, setPublished] = useState<boolean>(() =>
-    isGiftAlreadyPublished(getOrCreateActiveGiftId())
-  );
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
-    isGiftAlreadyPublished(getOrCreateActiveGiftId()) ? 'synced' : 'local'
-  );
-
-  const [sharedGiftId, setSharedGiftId] = useState<string | null>(() => getSharedGiftIdFromUrl());
-  const [isLegacyShareHash, setIsLegacyShareHash] = useState<boolean>(() => hasShareHashInUrl());
-  const isReadOnly = Boolean(sharedGiftId) || isLegacyShareHash;
-
-  const [loadingShared, setLoadingShared] = useState<boolean>(() => Boolean(getSharedGiftIdFromUrl()));
-  const [sharedNotFound, setSharedNotFound] = useState(false);
+  const [savingDefaults, setSavingDefaults] = useState(false);
 
   const [config, setConfig] = useState<ExperienceConfig>(() =>
-    getSharedGiftIdFromUrl() || hasShareHashInUrl() ? DEFAULT_EXPERIENCE : loadSavedExperience()
+    IS_DEV_EDITOR ? loadSavedExperience() : DEFAULT_EXPERIENCE
   );
 
-  const syncTimerRef = useRef<number | null>(null);
+  const bakeTimerRef = useRef<number | null>(null);
+  const bakeSeqRef = useRef(0);
+  const bakeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingConfigRef = useRef<ExperienceConfig | null>(null);
 
-  // Track Firebase Auth state for creators
-  useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      setAuthUser(user);
-    });
-  }, []);
+  const commitDefaultsToProject = useCallback((nextConfig: ExperienceConfig) => {
+    if (!IS_DEV_EDITOR) return;
+    const seq = ++bakeSeqRef.current;
+    setSavingDefaults(true);
 
-  // Watch URL changes (`?g=<giftId>`, `#g=<giftId>`, or legacy `#gift=...`)
-  useEffect(() => {
-    const handleLocationChange = () => {
-      const nextGiftId = getSharedGiftIdFromUrl();
-      const nextLegacy = hasShareHashInUrl();
-      setSharedGiftId(nextGiftId);
-      setIsLegacyShareHash(nextLegacy);
-      setStage('welcome');
-      setScrapbookRevealed(false);
-      setActivePhoto(null);
-      setPersonalizeOpen(false);
-      setShareOpen(false);
-      window.scrollTo({ top: 0 });
-    };
-
-    window.addEventListener('hashchange', handleLocationChange);
-    window.addEventListener('popstate', handleLocationChange);
-    return () => {
-      window.removeEventListener('hashchange', handleLocationChange);
-      window.removeEventListener('popstate', handleLocationChange);
-    };
-  }, []);
-
-  // Subscribe live to a shared Firestore gift document when `?g=<giftId>` is present
-  useEffect(() => {
-    if (!sharedGiftId) {
-      setLoadingShared(false);
-      setSharedNotFound(false);
-      return;
-    }
-
-    setLoadingShared(true);
-    setSharedNotFound(false);
-
-    const unsubscribe = subscribeToSharedGift(
-      sharedGiftId,
-      (remoteConfig) => {
-        setLoadingShared(false);
-        if (!remoteConfig) {
-          setSharedNotFound(true);
-          return;
+    bakeQueueRef.current = bakeQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const baked = await bakeDefaultsToProject(nextConfig);
+        if (seq !== bakeSeqRef.current) return;
+        if (baked) {
+          setConfig(baked);
+          clearSavedLocalExperience();
         }
-        setSharedNotFound(false);
-        setConfig(remoteConfig);
-      },
-      () => {
-        setLoadingShared(false);
-        setSharedNotFound(true);
-      }
-    );
+        setSavingDefaults(false);
+      });
+  }, []);
 
-    return () => unsubscribe();
-  }, [sharedGiftId]);
-
-  // Backwards-compatibility support for legacy `#gift=...` links
+  // Automatically bake any customizations already saved in AI Studio preview localStorage
+  // into `src/data/defaultExperience.json` and `src/assets/images/` on load.
   useEffect(() => {
-    if (sharedGiftId) return;
-    if (!isLegacyShareHash) {
-      setConfig(loadSavedExperience());
-      return;
-    }
+    if (!IS_DEV_EDITOR) return;
+    if (!hasSavedLocalExperience()) return;
+    const existingLocal = loadSavedExperience();
+    commitDefaultsToProject(existingLocal);
+  }, [commitDefaultsToProject]);
 
-    let active = true;
-    parseSharedGiftFromUrl().then((parsed) => {
-      if (!active) return;
-      if (parsed) {
-        setConfig(parsed);
-      }
-    });
+  useEffect(() => {
     return () => {
-      active = false;
+      if (bakeTimerRef.current) {
+        window.clearTimeout(bakeTimerRef.current);
+      }
     };
-  }, [sharedGiftId, isLegacyShareHash]);
+  }, []);
 
   // Gently quiet the ambient decorations when the visitor scrolls down to the final ending
   useEffect(() => {
@@ -164,53 +97,40 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrapbookRevealed]);
 
-  // Live-sync creator edits to the exact same unique Firestore link once published
-  const scheduleFirestoreSync = useCallback(
-    (nextConfig: ExperienceConfig) => {
-      if (!authUser || !published) return;
-      if (syncTimerRef.current) {
-        window.clearTimeout(syncTimerRef.current);
-      }
-      setSyncStatus('saving');
-      syncTimerRef.current = window.setTimeout(async () => {
-        try {
-          const resolvedId = await saveGiftToFirestore(activeGiftId, nextConfig, authUser.uid);
-          if (resolvedId !== activeGiftId) {
-            setActiveGiftId(resolvedId);
-          }
-          setSyncStatus('synced');
-        } catch {
-          setSyncStatus('error');
-        }
-      }, 650);
-    },
-    [authUser, published, activeGiftId]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (syncTimerRef.current) {
-        window.clearTimeout(syncTimerRef.current);
-      }
-    };
-  }, []);
-
   const handleUpdateConfig = useCallback(
     (next: ExperienceConfig) => {
-      if (isReadOnly) return;
+      if (!IS_DEV_EDITOR) return;
       setConfig(next);
       saveExperience(next);
-      scheduleFirestoreSync(next);
+      pendingConfigRef.current = next;
+
+      if (bakeTimerRef.current) {
+        window.clearTimeout(bakeTimerRef.current);
+      }
+      setSavingDefaults(true);
+      bakeTimerRef.current = window.setTimeout(() => {
+        const toBake = pendingConfigRef.current;
+        pendingConfigRef.current = null;
+        if (toBake) {
+          commitDefaultsToProject(toBake);
+        }
+      }, 450);
     },
-    [isReadOnly, scheduleFirestoreSync]
+    [commitDefaultsToProject]
   );
 
-  const handleResetConfig = useCallback(() => {
-    if (isReadOnly) return;
-    resetSavedExperience();
-    setConfig(DEFAULT_EXPERIENCE);
-    scheduleFirestoreSync(DEFAULT_EXPERIENCE);
-  }, [isReadOnly, scheduleFirestoreSync]);
+  const handleClosePersonalize = useCallback(() => {
+    setPersonalizeOpen(false);
+    if (bakeTimerRef.current) {
+      window.clearTimeout(bakeTimerRef.current);
+      bakeTimerRef.current = null;
+    }
+    if (pendingConfigRef.current) {
+      const toBake = pendingConfigRef.current;
+      pendingConfigRef.current = null;
+      commitDefaultsToProject(toBake);
+    }
+  }, [commitDefaultsToProject]);
 
   const handleRevealScrapbook = useCallback(() => {
     setScrapbookRevealed(true);
@@ -235,10 +155,10 @@ export default function App() {
       {/* Soft warm paper backdrop with gentle drifting elements & tappable stars */}
       <AmbientBackdrop
         quiet={nearEnding}
-        hideStars={personalizeOpen || shareOpen || Boolean(activePhoto)}
+        hideStars={personalizeOpen || Boolean(activePhoto)}
       />
 
-      {/* Background-blended brand mark continuing gently across all screens (no separate top bar) */}
+      {/* Background-blended brand mark continuing gently across all screens */}
       <div
         aria-label="whisker."
         className="fixed top-6 left-1/2 -translate-x-1/2 z-[1] pointer-events-none select-none"
@@ -251,100 +171,74 @@ export default function App() {
         </span>
       </div>
 
-      {loadingShared ? (
-        <section className="relative z-10 min-h-[100dvh] w-full flex items-center justify-center px-6">
-          <p
-            className="text-lg text-[#7B7167]"
-            style={{ fontFamily: 'var(--font-serif-story)' }}
+      {/* Continuous storybook journey */}
+      <AnimatePresence mode="wait">
+        {stage === 'welcome' && (
+          <WelcomeScene
+            key="stage-welcome"
+            friendLabel={config.friendLabel}
+            onEnter={() => setStage('question')}
+          />
+        )}
+
+        {stage === 'question' && (
+          <TrustQuestionScene
+            key="stage-question"
+            onYes={() => setStage('surprise')}
+          />
+        )}
+
+        {stage === 'surprise' && (
+          <YesSurpriseScene
+            key="stage-surprise"
+            onOpenGift={() => {
+              setStage('card');
+              window.scrollTo({ top: 0 });
+            }}
+          />
+        )}
+
+        {stage === 'card' && (
+          <motion.div
+            key="stage-card"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.55 }}
+            className="relative z-10 w-full"
           >
-            Opening something made for you...
-          </p>
-        </section>
-      ) : sharedNotFound ? (
-        <section className="relative z-10 min-h-[100dvh] w-full flex items-center justify-center px-6">
-          <div className="max-w-md w-full rounded-2xl paper-card p-8 text-center space-y-4">
-            <h1
-              className="text-2xl font-medium text-[#2E2925]"
-              style={{ fontFamily: 'var(--font-serif-story)' }}
-            >
-              We couldn&apos;t find this gift
-            </h1>
-            <p className="text-sm text-[#6B6158] leading-relaxed">
-              This link may be incomplete or no longer available. Double-check the link with the friend who sent it.
-            </p>
-          </div>
-        </section>
-      ) : (
-        /* Continuous storybook journey */
-        <AnimatePresence mode="wait">
-          {stage === 'welcome' && (
-            <WelcomeScene
-              key="stage-welcome"
-              friendLabel={config.friendLabel}
-              onEnter={() => setStage('question')}
+            {/* Scene 05: Envelope opening into the first letter card */}
+            <EnvelopeScene
+              envelopeLabel={config.envelopeLabel}
+              openingLetter={config.openingLetter}
+              isScrapbookRevealed={scrapbookRevealed}
+              onRevealScrapbook={handleRevealScrapbook}
             />
-          )}
 
-          {stage === 'question' && (
-            <TrustQuestionScene
-              key="stage-question"
-              onYes={() => setStage('surprise')}
-            />
-          )}
+            {/* Scene 06 & 07: The Scrapbook Memories + The Quiet Ending */}
+            {scrapbookRevealed && (
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <ScrapbookCard
+                  config={config}
+                  onSelectPhoto={(photo) => setActivePhoto(photo)}
+                />
 
-          {stage === 'surprise' && (
-            <YesSurpriseScene
-              key="stage-surprise"
-              onOpenGift={() => {
-                setStage('card');
-                window.scrollTo({ top: 0 });
-              }}
-            />
-          )}
-
-          {stage === 'card' && (
-            <motion.div
-              key="stage-card"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.55 }}
-              className="relative z-10 w-full"
-            >
-              {/* Scene 05: Envelope opening into the first letter card */}
-              <EnvelopeScene
-                envelopeLabel={config.envelopeLabel}
-                openingLetter={config.openingLetter}
-                isScrapbookRevealed={scrapbookRevealed}
-                onRevealScrapbook={handleRevealScrapbook}
-              />
-
-              {/* Scene 06 & 07: The Scrapbook Memories + The Quiet Ending */}
-              {scrapbookRevealed && (
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <ScrapbookCard
-                    config={config}
-                    onSelectPhoto={(photo) => setActivePhoto(photo)}
-                  />
-
-                  <EndingScene
-                    endingLines={config.endingLines}
-                    endingSignOff={config.endingSignOff}
-                    isReadOnly={isReadOnly}
-                    onReplay={handleReplay}
-                    onOpenPersonalize={() => setPersonalizeOpen(true)}
-                    onOpenShareLink={() => setShareOpen(true)}
-                  />
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
+                <EndingScene
+                  endingLines={config.endingLines}
+                  endingSignOff={config.endingSignOff}
+                  canEdit={IS_DEV_EDITOR}
+                  onReplay={handleReplay}
+                  onOpenPersonalize={() => setPersonalizeOpen(true)}
+                />
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Enlarged Polaroid Lightbox */}
       <PhotoLightbox
@@ -352,31 +246,15 @@ export default function App() {
         onClose={() => setActivePhoto(null)}
       />
 
-      {/* Understated Personalization Drawer & Share Modal (never rendered in read-only shared links) */}
-      {!isReadOnly && (
-        <>
-          <PersonalizeDrawer
-            open={personalizeOpen}
-            config={config}
-            syncStatus={syncStatus}
-            onChange={handleUpdateConfig}
-            onReset={handleResetConfig}
-            onClose={() => setPersonalizeOpen(false)}
-          />
-
-          <ShareLinkModal
-            open={shareOpen}
-            config={config}
-            giftId={activeGiftId}
-            authUser={authUser}
-            onGiftIdResolved={(resolvedId) => setActiveGiftId(resolvedId)}
-            onSyncComplete={() => {
-              setPublished(true);
-              setSyncStatus('synced');
-            }}
-            onClose={() => setShareOpen(false)}
-          />
-        </>
+      {/* Personalization drawer available only in AI Studio preview so edits save directly into project defaults */}
+      {IS_DEV_EDITOR && (
+        <PersonalizeDrawer
+          open={personalizeOpen}
+          config={config}
+          savingDefaults={savingDefaults}
+          onChange={handleUpdateConfig}
+          onClose={handleClosePersonalize}
+        />
       )}
     </main>
   );
