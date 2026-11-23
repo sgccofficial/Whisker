@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, Copy, Check } from 'lucide-react';
+import { X, Upload, Copy, Check, Download } from 'lucide-react';
 import { ExperienceConfig } from '../data/experienceContent';
 import { compressImageDataUrl } from '../utils/imageCompress';
 
@@ -261,9 +261,19 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
 
               {/* Photographs */}
               <div className="space-y-4 pt-4 border-t border-[#3A322C]/10">
-                <h3 className="text-sm font-medium text-[#2E2925]">
-                  Scrapbook photographs
-                </h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-[#2E2925]">
+                    Scrapbook photographs
+                  </h3>
+                  <a
+                    href="/__download-photos.zip"
+                    download="whisker-photos.zip"
+                    className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1 rounded-full bg-[#EFE9DD] text-xs font-medium text-[#2E2925] hover:bg-[#E4DAC9] transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Download 1.jpg–6.jpg</span>
+                  </a>
+                </div>
 
                 <div className="space-y-4">
                   {config.photos.map((photo, index) => (
@@ -280,7 +290,7 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs text-[#7B7167]">
-                            Photo {index + 1}
+                            Photo {index + 1} ({index + 1}.jpg)
                           </p>
                           <input
                             ref={(el) => {
@@ -293,14 +303,25 @@ export const PersonalizeDrawer: React.FC<PersonalizeDrawerProps> = ({
                             }
                             className="hidden"
                           />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRefs.current[photo.id]?.click()}
-                            className="mt-1 inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1 rounded-lg bg-[#F4EFE4] text-xs font-medium text-[#2E2925] hover:bg-[#EAE2D3] transition-colors whitespace-nowrap shrink-0"
-                          >
-                            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-                            <span>Replace photo</span>
-                          </button>
+                          <div className="mt-1 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRefs.current[photo.id]?.click()}
+                              className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1 rounded-lg bg-[#F4EFE4] text-xs font-medium text-[#2E2925] hover:bg-[#EAE2D3] transition-colors whitespace-nowrap shrink-0"
+                            >
+                              <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+                              <span>Replace photo</span>
+                            </button>
+                            <a
+                              href={photo.src}
+                              download={`${index + 1}.jpg`}
+                              className="inline-flex items-center justify-center min-w-[36px] min-h-[36px] rounded-lg bg-[#F4EFE4] text-[#5C534B] hover:bg-[#EAE2D3] hover:text-[#2E2925] transition-colors shrink-0"
+                              aria-label={`Download ${index + 1}.jpg`}
+                              title={`Download ${index + 1}.jpg`}
+                            >
+                              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                            </a>
+                          </div>
                         </div>
                       </div>
 

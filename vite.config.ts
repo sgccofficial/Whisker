@@ -1,6 +1,5 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { defineConfig, type Plugin } from 'vite';
@@ -33,19 +32,120 @@ interface ExperiencePayload {
   photos: PhotoItem[];
 }
 
-const MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-};
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf: Buffer): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function buildStoreZip(files: Array<{ name: string; data: Buffer }>): Buffer {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const nameBuf = Buffer.from(file.name, 'utf8');
+    const data = file.data;
+    const sum = crc32(data);
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(0, 12);
+    localHeader.writeUInt32LE(sum, 14);
+    localHeader.writeUInt32LE(data.length, 18);
+    localHeader.writeUInt32LE(data.length, 22);
+    localHeader.writeUInt16LE(nameBuf.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    localParts.push(localHeader, nameBuf, data);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(0, 14);
+    centralHeader.writeUInt32LE(sum, 16);
+    centralHeader.writeUInt32LE(data.length, 20);
+    centralHeader.writeUInt32LE(data.length, 24);
+    centralHeader.writeUInt16LE(nameBuf.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+
+    centralParts.push(centralHeader, nameBuf);
+    offset += localHeader.length + nameBuf.length + data.length;
+  }
+
+  const centralSize = centralParts.reduce((acc, b) => acc + b.length, 0);
+  const endRecord = Buffer.alloc(22);
+  endRecord.writeUInt32LE(0x06054b50, 0);
+  endRecord.writeUInt16LE(0, 4);
+  endRecord.writeUInt16LE(0, 6);
+  endRecord.writeUInt16LE(files.length, 8);
+  endRecord.writeUInt16LE(files.length, 10);
+  endRecord.writeUInt32LE(centralSize, 12);
+  endRecord.writeUInt32LE(offset, 16);
+  endRecord.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, ...centralParts, endRecord]);
+}
 
 function bakeDefaultsDevPlugin(): Plugin {
   return {
     name: 'bake-defaults-to-project',
     apply: 'serve',
     configureServer(server) {
+      server.middlewares.use('/__download-photos.zip', (req, res, next) => {
+        if (req.method !== 'GET') {
+          next();
+          return;
+        }
+        try {
+          const imagesDir = path.resolve(__dirname, 'public/images');
+          const entries: Array<{ name: string; data: Buffer }> = [];
+          for (let i = 1; i <= 6; i++) {
+            const filename = `${i}.jpg`;
+            const fullPath = path.join(imagesDir, filename);
+            if (fs.existsSync(fullPath)) {
+              entries.push({ name: filename, data: fs.readFileSync(fullPath) });
+            }
+          }
+          const zipBuf = buildStoreZip(entries);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/zip');
+          res.setHeader('Content-Disposition', 'attachment; filename="whisker-photos.zip"');
+          res.setHeader('Content-Length', String(zipBuf.length));
+          res.end(zipBuf);
+        } catch {
+          res.statusCode = 500;
+          res.end('Could not package photos');
+        }
+      });
+
       server.middlewares.use('/__bake-defaults', (req, res, next) => {
         if (req.method !== 'POST') {
           next();
@@ -77,18 +177,16 @@ function bakeDefaultsDevPlugin(): Plugin {
             const incoming = JSON.parse(rawBody) as Partial<ExperiencePayload>;
 
             const defaultJsonPath = path.resolve(__dirname, 'src/data/defaultExperience.json');
-            const imagesDir = path.resolve(__dirname, 'src/assets/images');
+            const imagesDir = path.resolve(__dirname, 'public/images');
             fs.mkdirSync(imagesDir, { recursive: true });
 
             const existing = JSON.parse(
               fs.readFileSync(defaultJsonPath, 'utf8')
             ) as ExperiencePayload;
 
-            const existingImages = fs.readdirSync(imagesDir);
-
             const bakedPhotos: PhotoItem[] = existing.photos.map((base, idx) => {
               const item = Array.isArray(incoming.photos) ? incoming.photos[idx] : undefined;
-              const safeId = /^[a-zA-Z0-9_-]+$/.test(base.id) ? base.id : `photo-${idx + 1}`;
+              const slotFilename = `${idx + 1}.jpg`;
               let resolvedSrc = base.src;
 
               if (item && typeof item.src === 'string' && item.src.length > 0) {
@@ -96,34 +194,11 @@ function bakeDefaultsDevPlugin(): Plugin {
                   /^data:(image\/(?:jpeg|jpg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/
                 );
                 if (dataUrlMatch) {
-                  const ext = MIME_TO_EXT[dataUrlMatch[1].toLowerCase()] ?? 'jpg';
                   const imgBuffer = Buffer.from(dataUrlMatch[2], 'base64');
-                  const hash = crypto
-                    .createHash('sha256')
-                    .update(imgBuffer)
-                    .digest('hex')
-                    .slice(0, 8);
-                  const filename = `custom_${safeId}_${hash}.${ext}`;
-                  const targetFile = path.join(imagesDir, filename);
-
-                  // Clean up superseded custom image files for this slot
-                  const prefix = `custom_${safeId}_`;
-                  for (const oldFile of existingImages) {
-                    if (oldFile.startsWith(prefix) && oldFile !== filename) {
-                      try {
-                        fs.unlinkSync(path.join(imagesDir, oldFile));
-                      } catch {
-                        // Ignore cleanup error
-                      }
-                    }
-                  }
-
-                  if (!fs.existsSync(targetFile)) {
-                    fs.writeFileSync(targetFile, imgBuffer);
-                  }
-                  resolvedSrc = `/src/assets/images/${filename}`;
+                  fs.writeFileSync(path.join(imagesDir, slotFilename), imgBuffer);
+                  resolvedSrc = `/images/${slotFilename}`;
                 } else if (
-                  item.src.startsWith('/src/assets/images/') &&
+                  item.src.startsWith('/images/') &&
                   !item.src.includes('..') &&
                   fs.existsSync(path.join(imagesDir, path.basename(item.src)))
                 ) {
@@ -238,23 +313,6 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       bakeDefaultsDevPlugin(),
-      // Copies src/assets into dist/ so root-relative URLs like
-      // "/src/assets/images/..." still resolve in production builds. Do not remove.
-      {
-        name: 'copy-unbundled-src-assets',
-        apply: 'build',
-        closeBundle(error?: Error): void {
-          if (error) {
-            return;
-          }
-          const distDir = path.resolve(__dirname, 'dist');
-          const srcAssets = path.resolve(__dirname, 'src/assets');
-          const distAssets = path.resolve(distDir, 'src/assets');
-          if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
-            fs.cpSync(srcAssets, distAssets, { recursive: true, force: true });
-          }
-        },
-      },
     ],
     resolve: {
       alias: {

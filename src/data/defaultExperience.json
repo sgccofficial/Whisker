@@ -19,7 +19,7 @@
   "photos": [
     {
       "id": "coffee-afternoon",
-      "src": "/src/assets/images/custom_coffee-afternoon_cdfa7baa.jpg",
+      "src": "/images/1.jpg",
       "alt": "Memory photograph 1",
       "caption": "proof that this girl is beautiful, both from the outside and inside. ",
       "dateNote": "framing herself within a frame using a frame. ",
@@ -30,7 +30,7 @@
     },
     {
       "id": "picnic-blanket",
-      "src": "/src/assets/images/custom_picnic-blanket_e317d610.jpg",
+      "src": "/images/2.jpg",
       "alt": "Memory photograph 2",
       "caption": "roaming, as usually as on every day. ",
       "dateNote": "fun outing with her friends, it seems. ",
@@ -41,7 +41,7 @@
     },
     {
       "id": "sunset-walk",
-      "src": "/src/assets/images/custom_sunset-walk_e2f58947.jpg",
+      "src": "/images/3.jpg",
       "alt": "Memory photograph 3",
       "caption": "I don't know why, but this one belongs here.",
       "dateNote": "looks like everyone are trying to find a way to befriend her. ",
@@ -52,7 +52,7 @@
     },
     {
       "id": "rainy-window",
-      "src": "/src/assets/images/custom_rainy-window_ba878ee7.jpg",
+      "src": "/images/4.jpg",
       "alt": "Memory photograph 4",
       "caption": "this one genuinely jumpscared me.",
       "dateNote": "please ask someone else to click your pictures. personal advice.",
@@ -63,7 +63,7 @@
     },
     {
       "id": "evening-lights",
-      "src": "/src/assets/images/custom_evening-lights_0c997187.jpg",
+      "src": "/images/5.jpg",
       "alt": "Memory photograph 5",
       "caption": "This girl rises under the basking sun, right when it signs off.",
       "dateNote": "under the sun's light, but brighter.",
@@ -74,7 +74,7 @@
     },
     {
       "id": "golden-shore",
-      "src": "/src/assets/images/custom_golden-shore_b1dd4c04.jpg",
+      "src": "/images/6.jpg",
       "alt": "Memory photograph 6",
       "caption": "and...how could I forget this?",
       "dateNote": "and that's why God's there with every step of hers.",
